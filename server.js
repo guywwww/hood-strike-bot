@@ -4,9 +4,15 @@ const mongoose = require("mongoose");
 const app = express();
 app.use(express.json());
 
-// 🔥 CONNECT MONGODB (PASTE YOUR LINK HERE)
+// ================= HEALTH CHECK =================
+app.get("/", (req, res) => {
+  res.send("Hood Strike API Online");
+});
+
+// ================= DATABASE =================
 mongoose.connect("mongodb+srv://HoodStrikeBot:<db_password>@cluster0.giyufvh.mongodb.net/?appName=Cluster0");
 
+// ================= BAN SYSTEM =================
 const BanSchema = new mongoose.Schema({
   username: String,
   reason: String
@@ -14,62 +20,68 @@ const BanSchema = new mongoose.Schema({
 
 const Ban = mongoose.model("Ban", BanSchema);
 
+// ================= QUEUE =================
 let queue = [];
 
-/* BAN */
+// ================= BAN =================
 app.post("/ban", async (req, res) => {
-  const { username, reason } = req.body;
+  try {
+    const { username, reason } = req.body;
 
-  await Ban.findOneAndUpdate(
-    { username },
-    { username, reason },
-    { upsert: true }
-  );
+    await Ban.findOneAndUpdate(
+      { username },
+      { username, reason },
+      { upsert: true }
+    );
 
-  queue.push({ type: "ban", username, reason });
+    queue.push({ type: "ban", username, reason });
 
-  res.json({ ok: true });
-});
-
-/* UNBAN */
-app.post("/unban", async (req, res) => {
-  await Ban.deleteOne({ username: req.body.username });
-
-  queue.push({ type: "unban", username: req.body.username });
-
-  res.json({ ok: true });
-});
-
-/* KICK */
-app.post("/kick", (req, res) => {
-  queue.push({ type: "kick", username: req.body.username });
-  res.json({ ok: true });
-});
-
-/* GLOBAL */
-app.post("/global", (req, res) => {
-  queue.push({ type: "global", message: req.body.message });
-  res.json({ ok: true });
-});
-
-/* CHECK BAN */
-app.get("/check-ban/:u", async (req, res) => {
-  const ban = await Ban.findOne({ username: req.params.u });
-
-  if (ban) {
-    return res.json({
-      banned: true,
-      reason: ban.reason
-    });
+    return res.json({ ok: true });
+  } catch {
+    return res.json({ ok: false });
   }
-
-  res.json({ banned: false });
 });
 
-/* POLL */
+// ================= UNBAN =================
+app.post("/unban", async (req, res) => {
+  try {
+    const { username } = req.body;
+
+    await Ban.deleteOne({ username });
+
+    queue.push({ type: "unban", username });
+
+    return res.json({ ok: true });
+  } catch {
+    return res.json({ ok: false });
+  }
+});
+
+// ================= KICK =================
+app.post("/kick", (req, res) => {
+  const { username } = req.body;
+
+  queue.push({ type: "kick", username });
+
+  return res.json({ ok: true });
+});
+
+// ================= GLOBAL =================
+app.post("/global", (req, res) => {
+  const { message } = req.body;
+
+  queue.push({ type: "global", message });
+
+  return res.json({ ok: true });
+});
+
+// ================= POLL =================
 app.get("/poll", (req, res) => {
   res.json(queue);
   queue = [];
 });
 
-app.listen(process.env.PORT || 3000);
+// ================= START =================
+app.listen(process.env.PORT || 3000, () => {
+  console.log("Server running");
+});

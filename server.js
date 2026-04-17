@@ -4,81 +4,76 @@ const mongoose = require("mongoose");
 const app = express();
 app.use(express.json());
 
-const MONGO = "mongodb+srv://HoodStrikeBot:Dante69195999@cluster0.giyufvh.mongodb.net/hoodstrike?retryWrites=true&w=majority";
+// ================= MONGO CONNECTION =================
+const uri = "mongodb+srv://HoodStrikeBot:Dante69195999@cluster0.giyufvh.mongodb.net/hoodstrike?retryWrites=true&w=majority";
 
-mongoose.connect(MONGO);
+mongoose.connect(uri, {
+    serverSelectionTimeoutMS: 10000,
+    tls: true
+})
+.then(() => console.log("MongoDB connected"))
+.catch(err => console.log("Mongo error:", err));
 
+// ================= DATABASE =================
 const BanSchema = new mongoose.Schema({
     username: String,
-    reason: String,
-    alts: [String]
+    reason: String
 });
 
 const Ban = mongoose.model("Ban", BanSchema);
 
+// ================= CHECK BAN =================
+app.get("/check/:username", async (req, res) => {
+    const user = await Ban.findOne({ username: req.params.username });
+
+    if (user) {
+        return res.json({
+            banned: true,
+            reason: user.reason
+        });
+    }
+
+    res.json({ banned: false });
+});
+
+// ================= BAN USER =================
 app.post("/ban", async (req, res) => {
     const { username, reason } = req.body;
 
-    let user = await Ban.findOne({ username });
+    await Ban.create({ username, reason });
 
-    if (!user) {
-        user = new Ban({ username, reason, alts: [] });
-    } else {
-        user.reason = reason;
-    }
-
-    await user.save();
-    res.send({ success: true });
+    res.json({ success: true });
 });
 
+// ================= UNBAN USER =================
 app.post("/unban", async (req, res) => {
     const { username } = req.body;
 
-    const user = await Ban.findOne({ username });
-    if (user) {
-        await Ban.deleteMany({
-            $or: [
-                { username },
-                { username: { $in: user.alts } }
-            ]
-        });
-    }
+    await Ban.deleteOne({ username });
 
-    res.send({ success: true });
+    res.json({ success: true });
 });
 
-app.get("/check/:username", async (req, res) => {
-    const username = req.params.username;
+// ================= POLL (for Roblox) =================
+let actions = [];
 
-    const banned = await Ban.findOne({
-        $or: [
-            { username },
-            { alts: username }
-        ]
-    });
-
-    if (banned) {
-        return res.send({
-            banned: true,
-            reason: banned.reason || "Banned"
-        });
-    }
-
-    res.send({ banned: false });
+app.get("/poll", (req, res) => {
+    res.json(actions);
+    actions = [];
 });
 
-app.post("/linkalt", async (req, res) => {
-    const { main, alt } = req.body;
-
-    const user = await Ban.findOne({ username: main });
-    if (user) {
-        if (!user.alts.includes(alt)) {
-            user.alts.push(alt);
-            await user.save();
-        }
-    }
-
-    res.send({ success: true });
+// ================= ACTION ADDERS =================
+app.post("/action/kick", (req, res) => {
+    actions.push({ type: "kick", username: req.body.username });
+    res.json({ success: true });
 });
 
-app.listen(3000);
+app.post("/action/ban", (req, res) => {
+    actions.push({ type: "ban", username: req.body.username, reason: req.body.reason });
+    res.json({ success: true });
+});
+
+// ================= START SERVER =================
+app.listen(process.env.PORT || 3000, () => {
+    console.log("Server running");
+});

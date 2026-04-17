@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const app = express();
 app.use(express.json());
 
-const MONGO = "YOUR_MONGODB_URL";
+const MONGO = "mongodb+srv://HoodStrikeBot:Dante69195999@cluster0.giyufvh.mongodb.net/?appName=Cluster0";
 
 mongoose.connect(MONGO);
 

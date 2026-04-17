@@ -46,6 +46,20 @@ app.post("/unban", (req, res) => {
     res.json({ ok: true });
 });
 
+app.post("/kick", (req, res) => {
+    const db = load();
+
+    const username = (req.body.username || "").toLowerCase();
+
+    if (!username) return res.status(400).json({ error: "missing username" });
+
+    db.actions.push({ type: "kick", username });
+
+    save(db);
+
+    res.json({ ok: true });
+});
+
 app.get("/check/:username", (req, res) => {
     const db = load();
 

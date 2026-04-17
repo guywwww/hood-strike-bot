@@ -5,7 +5,7 @@ const app = express();
 app.use(express.json());
 
 // CONNECT DATABASE
-mongoose.connect("YOUR_MONGO_URI_HERE");
+mongoose.connect("mongodb+srv://HoodStrikeBot:<db_password>@cluster0.giyufvh.mongodb.net/?appName=Cluster0");
 
 const BanSchema = new mongoose.Schema({
   username: String,

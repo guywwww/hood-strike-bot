@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const app = express();
 app.use(express.json());
 
-const MONGO = "mongodb+srv://HoodStrikeBot:BGydsq3!m33W5A%@cluster0.giyufvh.mongodb.net/?appName=Cluster0";
+const MONGO = "mongodb+srv://HoodStrikeBot:Dante69195999@cluster0.giyufvh.mongodb.net/hoodstrike?retryWrites=true&w=majority";
 
 mongoose.connect(MONGO);
 

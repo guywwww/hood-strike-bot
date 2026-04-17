@@ -1,85 +1,84 @@
 const express = require("express");
-const fs = require("fs");
+const mongoose = require("mongoose");
 
 const app = express();
 app.use(express.json());
 
-const FILE = "./db.json";
+const MONGO = "YOUR_MONGODB_URL";
 
-function load() {
-    if (!fs.existsSync(FILE)) return { bans: {}, actions: [] };
-    return JSON.parse(fs.readFileSync(FILE));
-}
+mongoose.connect(MONGO);
 
-function save(data) {
-    fs.writeFileSync(FILE, JSON.stringify(data));
-}
-
-app.post("/ban", (req, res) => {
-    const db = load();
-
-    const username = (req.body.username || "").toLowerCase();
-    const reason = req.body.reason || "No reason";
-
-    if (!username) return res.status(400).json({ error: "missing username" });
-
-    db.bans[username] = { reason, time: Date.now() };
-    db.actions.push({ type: "ban", username, reason });
-
-    save(db);
-
-    res.json({ ok: true });
+const BanSchema = new mongoose.Schema({
+    username: String,
+    reason: String,
+    alts: [String]
 });
 
-app.post("/unban", (req, res) => {
-    const db = load();
+const Ban = mongoose.model("Ban", BanSchema);
 
-    const username = (req.body.username || "").toLowerCase();
+app.post("/ban", async (req, res) => {
+    const { username, reason } = req.body;
 
-    if (!username) return res.status(400).json({ error: "missing username" });
+    let user = await Ban.findOne({ username });
 
-    delete db.bans[username];
-    db.actions.push({ type: "unban", username });
+    if (!user) {
+        user = new Ban({ username, reason, alts: [] });
+    } else {
+        user.reason = reason;
+    }
 
-    save(db);
-
-    res.json({ ok: true });
+    await user.save();
+    res.send({ success: true });
 });
 
-app.post("/kick", (req, res) => {
-    const db = load();
+app.post("/unban", async (req, res) => {
+    const { username } = req.body;
 
-    const username = (req.body.username || "").toLowerCase();
+    const user = await Ban.findOne({ username });
+    if (user) {
+        await Ban.deleteMany({
+            $or: [
+                { username },
+                { username: { $in: user.alts } }
+            ]
+        });
+    }
 
-    if (!username) return res.status(400).json({ error: "missing username" });
-
-    db.actions.push({ type: "kick", username });
-
-    save(db);
-
-    res.json({ ok: true });
+    res.send({ success: true });
 });
 
-app.get("/check/:username", (req, res) => {
-    const db = load();
+app.get("/check/:username", async (req, res) => {
+    const username = req.params.username;
 
-    const username = req.params.username.toLowerCase();
-    const ban = db.bans[username];
+    const banned = await Ban.findOne({
+        $or: [
+            { username },
+            { alts: username }
+        ]
+    });
 
-    if (!ban) return res.json({ banned: false });
+    if (banned) {
+        return res.send({
+            banned: true,
+            reason: banned.reason || "Banned"
+        });
+    }
 
-    res.json({ banned: true, reason: ban.reason });
+    res.send({ banned: false });
 });
 
-app.get("/poll", (req, res) => {
-    const db = load();
+app.post("/linkalt", async (req, res) => {
+    const { main, alt } = req.body;
 
-    const actions = db.actions;
-    db.actions = [];
+    const user = await Ban.findOne({ username: main });
+    if (user) {
+        if (!user.alts.includes(alt)) {
+            user.alts.push(alt);
+            await user.save();
+        }
+    }
 
-    save(db);
-
-    res.json(actions);
+    res.send({ success: true });
 });
 
 app.listen(3000);

@@ -1,32 +1,47 @@
 const express = require("express");
-const app = express();
+const mongoose = require("mongoose");
 
+const app = express();
 app.use(express.json());
+
+// ================= MONGO =================
+mongoose.connect("YOUR_MONGO_URI_HERE");
+
+// ================= DATABASE =================
+const BanSchema = new mongoose.Schema({
+  username: String,
+  reason: String,
+  alts: [String],
+  createdAt: { type: Date, default: Date.now }
+});
+
+const Ban = mongoose.model("Ban", BanSchema);
 
 // ================= QUEUE =================
 let queue = [];
 
-// ================= BAN =================
-app.post("/ban", (req, res) => {
+// ================= BAN (PERMANENT) =================
+app.post("/ban", async (req, res) => {
   const { username, reason } = req.body;
 
-  queue.push({
-    type: "ban",
-    username,
-    reason
-  });
+  await Ban.findOneAndUpdate(
+    { username },
+    { username, reason },
+    { upsert: true }
+  );
+
+  queue.push({ type: "ban", username, reason });
 
   res.json({ ok: true });
 });
 
 // ================= UNBAN =================
-app.post("/unban", (req, res) => {
+app.post("/unban", async (req, res) => {
   const { username } = req.body;
 
-  queue.push({
-    type: "unban",
-    username
-  });
+  await Ban.deleteOne({ username });
+
+  queue.push({ type: "unban", username });
 
   res.json({ ok: true });
 });
@@ -35,15 +50,26 @@ app.post("/unban", (req, res) => {
 app.post("/kick", (req, res) => {
   const { username } = req.body;
 
-  queue.push({
-    type: "kick",
-    username
-  });
+  queue.push({ type: "kick", username });
 
   res.json({ ok: true });
 });
 
-// ================= POLL =================
+// ================= CHECK BAN (ROBLOX JOIN CHECK) =================
+app.get("/check/:username", async (req, res) => {
+  const user = await Ban.findOne({ username: req.params.username });
+
+  if (user) {
+    return res.json({
+      banned: true,
+      reason: user.reason
+    });
+  }
+
+  res.json({ banned: false });
+});
+
+// ================= POLL (FAST SYNC) =================
 app.get("/poll", (req, res) => {
   res.json(queue);
   queue = [];

@@ -4,21 +4,30 @@ const app = express();
 app.use(express.json());
 
 let queue = [];
+let bans = {}; // permanent bans stored here
 
 app.post("/ban", (req, res) => {
+  bans[req.body.username] = {
+    reason: req.body.reason || "no reason"
+  };
+
   queue.push({
     type: "ban",
     username: req.body.username,
-    reason: req.body.reason || "no reason"
+    reason: req.body.reason
   });
+
   res.json({ ok: true });
 });
 
 app.post("/unban", (req, res) => {
+  delete bans[req.body.username];
+
   queue.push({
     type: "unban",
     username: req.body.username
   });
+
   res.json({ ok: true });
 });
 
@@ -27,6 +36,7 @@ app.post("/kick", (req, res) => {
     type: "kick",
     username: req.body.username
   });
+
   res.json({ ok: true });
 });
 
@@ -35,7 +45,22 @@ app.post("/global", (req, res) => {
     type: "global",
     message: req.body.message
   });
+
   res.json({ ok: true });
+});
+
+// Roblox checks this
+app.get("/check-ban/:username", (req, res) => {
+  const user = req.params.username;
+
+  if (bans[user]) {
+    return res.json({
+      banned: true,
+      reason: bans[user].reason
+    });
+  }
+
+  res.json({ banned: false });
 });
 
 app.get("/poll", (req, res) => {

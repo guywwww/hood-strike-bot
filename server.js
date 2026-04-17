@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 const app = express();
 app.use(express.json());
 
-// CONNECT DATABASE
+// 🔥 CONNECT MONGODB (PASTE YOUR LINK HERE)
 mongoose.connect("mongodb+srv://HoodStrikeBot:<db_password>@cluster0.giyufvh.mongodb.net/?appName=Cluster0");
 
 const BanSchema = new mongoose.Schema({
@@ -52,7 +52,7 @@ app.post("/global", (req, res) => {
   res.json({ ok: true });
 });
 
-/* CHECK BAN (PERMANENT) */
+/* CHECK BAN */
 app.get("/check-ban/:u", async (req, res) => {
   const ban = await Ban.findOne({ username: req.params.u });
 

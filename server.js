@@ -1,23 +1,30 @@
 const express = require("express");
-const app = express();
+const mongoose = require("mongoose");
 
+const app = express();
 app.use(express.json());
 
-// REAL DATABASE (in-memory permanent for Render session)
-// If you want FULL persistence later, I can upgrade you to MongoDB
-const bans = new Map();
+mongoose.connect("mongodb+srv://HoodStrikeBot:<db_password>@cluster0.giyufvh.mongodb.net/?appName=Cluster0");
+
+const BanSchema = new mongoose.Schema({
+  username: String,
+  reason: String
+});
+
+const Ban = mongoose.model("Ban", BanSchema);
 
 const queue = [];
 
-// ================= BAN =================
-app.post("/ban", (req, res) => {
+app.post("/ban", async (req, res) => {
   const { username, reason } = req.body;
 
   if (!username) return res.json({ ok: false });
 
-  bans.set(username.toLowerCase(), {
-    reason: reason || "No reason"
-  });
+  await Ban.findOneAndUpdate(
+    { username: username.toLowerCase() },
+    { username: username.toLowerCase(), reason: reason || "No reason" },
+    { upsert: true }
+  );
 
   queue.push({
     type: "ban",
@@ -28,13 +35,12 @@ app.post("/ban", (req, res) => {
   res.json({ ok: true });
 });
 
-// ================= UNBAN =================
-app.post("/unban", (req, res) => {
+app.post("/unban", async (req, res) => {
   const { username } = req.body;
 
   if (!username) return res.json({ ok: false });
 
-  bans.delete(username.toLowerCase());
+  await Ban.deleteOne({ username: username.toLowerCase() });
 
   queue.push({
     type: "unban",
@@ -44,7 +50,6 @@ app.post("/unban", (req, res) => {
   res.json({ ok: true });
 });
 
-// ================= KICK =================
 app.post("/kick", (req, res) => {
   const { username } = req.body;
 
@@ -56,28 +61,27 @@ app.post("/kick", (req, res) => {
   res.json({ ok: true });
 });
 
-// ================= CHECK (REAL PERMANENT BAN CHECK) =================
-app.get("/check/:username", (req, res) => {
-  const user = req.params.username.toLowerCase();
+app.get("/check/:username", async (req, res) => {
+  const user = await Ban.findOne({
+    username: req.params.username.toLowerCase()
+  });
 
-  if (bans.has(user)) {
+  if (user) {
     return res.json({
       banned: true,
-      reason: bans.get(user).reason
+      reason: user.reason
     });
   }
 
   res.json({ banned: false });
 });
 
-// ================= POLL =================
 app.get("/poll", (req, res) => {
   res.json(queue.splice(0));
 });
 
-// ================= START =================
 app.get("/", (req, res) => {
-  res.send("Hood Strike API Running");
+  res.send("API ONLINE");
 });
 
 app.listen(process.env.PORT || 3000, () => {

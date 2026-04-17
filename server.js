@@ -3,11 +3,6 @@ const app = express();
 
 app.use(express.json());
 
-// ================= HEALTH CHECK =================
-app.get("/", (req, res) => {
-  res.send("Hood Strike API Online");
-});
-
 // ================= QUEUE =================
 let queue = [];
 
@@ -48,22 +43,6 @@ app.post("/kick", (req, res) => {
   res.json({ ok: true });
 });
 
-// ================= GLOBAL =================
-app.post("/global", (req, res) => {
-  const { message } = req.body;
-
-  if (!message) {
-    return res.json({ ok: false, error: "No message" });
-  }
-
-  queue.push({
-    type: "global",
-    message
-  });
-
-  res.json({ ok: true });
-});
-
 // ================= POLL =================
 app.get("/poll", (req, res) => {
   res.json(queue);
@@ -71,6 +50,10 @@ app.get("/poll", (req, res) => {
 });
 
 // ================= START =================
+app.get("/", (req, res) => {
+  res.send("Hood Strike API Online");
+});
+
 app.listen(process.env.PORT || 3000, () => {
   console.log("Server running");
 });

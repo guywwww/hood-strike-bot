@@ -1,70 +1,71 @@
 const express = require("express");
-const mongoose = require("mongoose");
+const fs = require("fs");
 
 const app = express();
 app.use(express.json());
 
-mongoose.connect("mongodb+srv://HoodStrikeBot:<db_password>@cluster0.giyufvh.mongodb.net/?appName=Cluster0");
+const FILE = "./db.json";
 
-const Ban = mongoose.model("Ban", new mongoose.Schema({
-  username: String,
-  reason: String
-}));
+function load() {
+    if (!fs.existsSync(FILE)) return { bans: {}, actions: [] };
+    return JSON.parse(fs.readFileSync(FILE));
+}
 
-const queue = [];
+function save(data) {
+    fs.writeFileSync(FILE, JSON.stringify(data));
+}
 
-app.post("/ban", async (req, res) => {
-  const { username, reason } = req.body;
-  if (!username) return res.json({ ok: false });
+app.post("/ban", (req, res) => {
+    const db = load();
 
-  await Ban.findOneAndUpdate(
-    { username: username.toLowerCase() },
-    { username: username.toLowerCase(), reason: reason || "No reason" },
-    { upsert: true }
-  );
+    const username = (req.body.username || "").toLowerCase();
+    const reason = req.body.reason || "No reason";
 
-  queue.push({ type: "ban", username, reason: reason || "No reason" });
+    if (!username) return res.status(400).json({ error: "missing username" });
 
-  res.json({ ok: true });
+    db.bans[username] = { reason, time: Date.now() };
+    db.actions.push({ type: "ban", username, reason });
+
+    save(db);
+
+    res.json({ ok: true });
 });
 
-app.post("/unban", async (req, res) => {
-  const { username } = req.body;
-  if (!username) return res.json({ ok: false });
+app.post("/unban", (req, res) => {
+    const db = load();
 
-  await Ban.deleteOne({ username: username.toLowerCase() });
+    const username = (req.body.username || "").toLowerCase();
 
-  queue.push({ type: "unban", username });
+    if (!username) return res.status(400).json({ error: "missing username" });
 
-  res.json({ ok: true });
+    delete db.bans[username];
+    db.actions.push({ type: "unban", username });
+
+    save(db);
+
+    res.json({ ok: true });
 });
 
-app.post("/kick", (req, res) => {
-  const { username } = req.body;
+app.get("/check/:username", (req, res) => {
+    const db = load();
 
-  queue.push({ type: "kick", username });
+    const username = req.params.username.toLowerCase();
+    const ban = db.bans[username];
 
-  res.json({ ok: true });
-});
+    if (!ban) return res.json({ banned: false });
 
-app.get("/check/:username", async (req, res) => {
-  const user = await Ban.findOne({
-    username: req.params.username.toLowerCase()
-  });
-
-  res.json(
-    user
-      ? { banned: true, reason: user.reason }
-      : { banned: false }
-  );
+    res.json({ banned: true, reason: ban.reason });
 });
 
 app.get("/poll", (req, res) => {
-  res.json(queue.splice(0));
+    const db = load();
+
+    const actions = db.actions;
+    db.actions = [];
+
+    save(db);
+
+    res.json(actions);
 });
 
-app.get("/", (req, res) => {
-  res.send("OK");
-});
-
-app.listen(process.env.PORT || 3000);
+app.listen(3000);

@@ -18,6 +18,18 @@ const PlayerSchema = new mongoose.Schema({
 
 const Player = mongoose.model("Player", PlayerSchema);
 
+// LIVE ACTION QUEUE (IMPORTANT FIX)
+let actions = [];
+
+/*
+actions format:
+{
+  type: "kick" | "ban",
+  username: "",
+  reason: ""
+}
+*/
+
 // BAN
 app.post("/ban", async (req, res) => {
     const { username, reason } = req.body;
@@ -27,6 +39,12 @@ app.post("/ban", async (req, res) => {
         { username, banned: true, reason },
         { upsert: true }
     );
+
+    actions.push({
+        type: "ban",
+        username,
+        reason
+    });
 
     res.json({ success: true });
 });
@@ -43,12 +61,19 @@ app.post("/unban", async (req, res) => {
     res.json({ success: true });
 });
 
-// KICK (temporary action only, not stored)
+// KICK (NOW FIXED)
 app.post("/kick", async (req, res) => {
+    const { username } = req.body;
+
+    actions.push({
+        type: "kick",
+        username
+    });
+
     res.json({ success: true });
 });
 
-// CHECK (ROBLOX uses this)
+// CHECK (instant ban check)
 app.get("/check/:username", async (req, res) => {
     const user = await Player.findOne({ username: req.params.username });
 
@@ -58,6 +83,14 @@ app.get("/check/:username", async (req, res) => {
         banned: user.banned,
         reason: user.reason
     });
+});
+
+// ROBLOX POLL SYSTEM (FIXED)
+app.get("/poll", (req, res) => {
+    const copy = [...actions];
+    actions = []; // clear after sending
+
+    res.json(copy);
 });
 
 const PORT = process.env.PORT || 3000;

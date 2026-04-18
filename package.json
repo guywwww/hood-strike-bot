@@ -4,14 +4,12 @@
   "main": "server.js",
   "type": "commonjs",
   "engines": {
-    "node": ">=18"
+    "node": "18.x"
   },
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "axios": "^1.6.0",
-    "discord.js": "^14.16.0",
     "express": "^4.19.2",
     "mongoose": "^8.5.0"
   }

@@ -4,76 +4,59 @@ const mongoose = require("mongoose");
 const app = express();
 app.use(express.json());
 
-// ================= MONGO CONNECTION =================
-const uri = "mongodb+srv://HoodStrikeBot:Dante69195999@cluster0.giyufvh.mongodb.net/hoodstrike?retryWrites=true&w=majority";
+mongoose.connect("YOUR_MONGODB_URI");
 
-mongoose.connect(uri, {
-    serverSelectionTimeoutMS: 10000,
-    tls: true
-})
-.then(() => console.log("MongoDB connected"))
-.catch(err => console.log("Mongo error:", err));
-
-// ================= DATABASE =================
-const BanSchema = new mongoose.Schema({
+const Ban = mongoose.model("Ban", {
     username: String,
     reason: String
 });
 
-const Ban = mongoose.model("Ban", BanSchema);
+let actions = [];
 
-// ================= CHECK BAN =================
-app.get("/check/:username", async (req, res) => {
-    const user = await Ban.findOne({ username: req.params.username });
-
-    if (user) {
-        return res.json({
-            banned: true,
-            reason: user.reason
-        });
-    }
-
-    res.json({ banned: false });
-});
-
-// ================= BAN USER =================
 app.post("/ban", async (req, res) => {
     const { username, reason } = req.body;
 
-    await Ban.create({ username, reason });
+    await Ban.findOneAndUpdate(
+        { username },
+        { username, reason },
+        { upsert: true }
+    );
 
-    res.json({ success: true });
+    actions.push({ type: "ban", username, reason });
+
+    res.sendStatus(200);
 });
 
-// ================= UNBAN USER =================
 app.post("/unban", async (req, res) => {
     const { username } = req.body;
 
     await Ban.deleteOne({ username });
 
-    res.json({ success: true });
+    actions.push({ type: "unban", username });
+
+    res.sendStatus(200);
 });
 
-// ================= POLL (for Roblox) =================
-let actions = [];
+app.post("/kick", (req, res) => {
+    const { username } = req.body;
+
+    actions.push({ type: "kick", username });
+
+    res.sendStatus(200);
+});
+
+app.get("/check/:username", async (req, res) => {
+    const user = await Ban.findOne({ username: req.params.username });
+
+    if (!user) return res.json({ banned: false });
+
+    res.json({ banned: true, reason: user.reason });
+});
 
 app.get("/poll", (req, res) => {
-    res.json(actions);
+    const data = actions;
     actions = [];
+    res.json(data);
 });
 
-// ================= ACTION ADDERS =================
-app.post("/action/kick", (req, res) => {
-    actions.push({ type: "kick", username: req.body.username });
-    res.json({ success: true });
-});
-
-app.post("/action/ban", (req, res) => {
-    actions.push({ type: "ban", username: req.body.username, reason: req.body.reason });
-    res.json({ success: true });
-});
-
-// ================= START SERVER =================
-app.listen(process.env.PORT || 3000, () => {
-    console.log("Server running");
-});
+app.listen(3000);
